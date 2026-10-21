@@ -2,6 +2,7 @@
 #include <QSyntaxHighlighter>
 #include <QTextCharFormat>
 #include <QRegularExpression>
+#include <QVector>
 
 class LuauHighlighter final : public QSyntaxHighlighter {
     Q_OBJECT
