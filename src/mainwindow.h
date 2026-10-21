@@ -5,6 +5,8 @@
 #include <QLabel>
 #include "codeeditor.h"
 
+class QLineEdit;
+
 class MainWindow final : public QMainWindow {
     Q_OBJECT
 public:
@@ -25,8 +27,8 @@ private:
     QPlainTextEdit *console{};
     QLabel *status{};
     QWidget *findBar{};
-    class QLineEdit *findInput{};
-    class QLineEdit *replaceInput{};
+    QLineEdit *findInput{};
+    QLineEdit *replaceInput{};
     CodeEditor *currentEditor() const;
     QString currentFilePath() const;
     void setCurrentFilePath(const QString &path);
