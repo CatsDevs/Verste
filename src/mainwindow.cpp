@@ -137,7 +137,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
 
 void MainWindow::applySettings() {
     QSettings settings;
-    resize(settings.value("window/size", QSize(1120, 760)).toSize());
+    if (settings.contains("window/geometry")) restoreGeometry(settings.value("window/geometry").toByteArray());
+    else resize(settings.value("window/size", QSize(1120, 760)).toSize());
 }
 
 CodeEditor *MainWindow::currentEditor() const {
