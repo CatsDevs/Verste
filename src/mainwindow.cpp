@@ -90,16 +90,19 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     replaceInput->setPlaceholderText("Replace with...");
     auto *nextButton = new QPushButton("Next", findBar);
     auto *replaceButton = new QPushButton("Replace", findBar);
+    auto *replaceAllButton = new QPushButton("Replace All", findBar);
     auto *closeFind = new QPushButton("×", findBar);
     closeFind->setMaximumWidth(36);
     findLayout->addWidget(findInput, 2);
     findLayout->addWidget(replaceInput, 2);
     findLayout->addWidget(nextButton);
     findLayout->addWidget(replaceButton);
+    findLayout->addWidget(replaceAllButton);
     findLayout->addWidget(closeFind);
     findBar->hide();
     connect(nextButton, &QPushButton::clicked, this, &MainWindow::findNext);
     connect(replaceButton, &QPushButton::clicked, this, &MainWindow::replaceCurrent);
+    connect(replaceAllButton, &QPushButton::clicked, this, &MainWindow::replaceAll);
     connect(closeFind, &QPushButton::clicked, findBar, &QWidget::hide);
     connect(findInput, &QLineEdit::returnPressed, this, &MainWindow::findNext);
 
@@ -242,6 +245,22 @@ void MainWindow::findNext() {
             status->setText("Text not found");
     }
 }
+void MainWindow::replaceAll() {
+    if (!currentEditor() || findInput->text().isEmpty()) return;
+    QTextDocument *doc = currentEditor()->document();
+    QTextCursor cursor(doc);
+    cursor.beginEditBlock();
+    int count = 0;
+    while (currentEditor()->find(findInput->text())) {
+        QTextCursor found = currentEditor()->textCursor();
+        found.insertText(replaceInput->text());
+        currentEditor()->setTextCursor(found);
+        ++count;
+    }
+    cursor.endEditBlock();
+    appendConsole(QString("Replace All: %1 occurrence(s) replaced.").arg(count));
+    status->setText(QString("Replaced %1 occurrence(s)").arg(count));
+}
 void MainWindow::replaceCurrent() {
     if (!currentEditor() || findInput->text().isEmpty()) return;
     QTextCursor cursor = currentEditor()->textCursor();
@@ -250,6 +269,13 @@ void MainWindow::replaceCurrent() {
         currentEditor()->setTextCursor(cursor);
     }
     findNext();
+}
+void MainWindow::closeEvent(QCloseEvent *event) {
+    QSettings settings;
+    settings.setValue("window/size", size());
+    settings.setValue("window/geometry", saveGeometry());
+    settings.sync();
+    event->accept();
 }
 void MainWindow::runChecks() {
     auto *editor = currentEditor();
