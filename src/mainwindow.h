@@ -6,6 +6,7 @@
 #include "codeeditor.h"
 
 class QLineEdit;
+class QCloseEvent;
 
 class MainWindow final : public QMainWindow {
     Q_OBJECT
@@ -22,6 +23,9 @@ private slots:
     void showFindBar();
     void findNext();
     void replaceCurrent();
+    void replaceAll();
+protected:
+    void closeEvent(QCloseEvent *event) override;
 private:
     QTabWidget *tabs{};
     QPlainTextEdit *console{};
