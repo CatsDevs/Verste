@@ -2,6 +2,8 @@
 
 #include <QAbstractItemView>
 #include <QKeyEvent>
+#include <QRegularExpression>
+#include <QColor>
 #include <QPainter>
 #include <QScrollBar>
 #include <QStringListModel>
