@@ -12,4 +12,6 @@ protected:
 private:
     struct Rule { QRegularExpression pattern; QTextCharFormat format; };
     QVector<Rule> rules;
+    QTextCharFormat stringFormat;
+    QTextCharFormat commentFormat;
 };
