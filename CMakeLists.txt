@@ -15,6 +15,10 @@ qt_add_executable(Verste
     src/codeeditor.cpp
     src/luauhighlighter.h
     src/luauhighlighter.cpp
+    src/scripthistory.h
+    src/scripthistory.cpp
+    src/apicatalog.h
+    src/apicatalog.cpp
 )
 
 target_link_libraries(Verste PRIVATE Qt6::Widgets)
