@@ -13,10 +13,7 @@ void ScriptHistory::save(const QString &source, const QString &label, const QStr
     entry.source = source;
     entry.timestamp = QDateTime::currentDateTime();
 
-    settings.beginWriteArray("scriptHistory", 0);
-    settings.endArray();
     settings.remove("scriptHistory");
-
     settings.beginWriteArray("scriptHistory", qMin(99, current.size()) + 1);
     settings.setArrayIndex(0);
     settings.setValue("id", entry.id);
