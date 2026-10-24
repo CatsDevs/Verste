@@ -14,14 +14,14 @@ void ScriptHistory::save(const QString &source, const QString &label, const QStr
     entry.timestamp = QDateTime::currentDateTime();
 
     settings.remove("scriptHistory");
-    settings.beginWriteArray("scriptHistory", qMin(99, current.size()) + 1);
+    settings.beginWriteArray("scriptHistory", qMin(99, static_cast<int>(current.size())) + 1);
     settings.setArrayIndex(0);
     settings.setValue("id", entry.id);
     settings.setValue("label", entry.label);
     settings.setValue("reason", entry.reason);
     settings.setValue("source", entry.source);
     settings.setValue("timestamp", entry.timestamp);
-    const int keep = qMin(99, current.size());
+    const int keep = qMin(99, static_cast<int>(current.size()));
     for (int i = 0; i < keep; ++i) {
         settings.setArrayIndex(i + 1);
         settings.setValue("id", current[i].id);
