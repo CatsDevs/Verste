@@ -4,6 +4,7 @@
 #include <QPlainTextEdit>
 #include <QLabel>
 #include "codeeditor.h"
+#include "scripthistory.h"
 
 class QLineEdit;
 class QCloseEvent;
@@ -19,6 +20,9 @@ private slots:
     void saveFileAs();
     void closeTab(int index);
     void runChecks();
+    void showHistory();
+    void saveHistorySnapshot();
+    void auditApiCompatibility();
     void clearConsole();
     void showFindBar();
     void findNext();
