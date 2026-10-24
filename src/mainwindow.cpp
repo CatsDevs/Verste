@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "luauhighlighter.h"
+#include "apicatalog.h"
 
 #include <QAction>
 #include <QFileDialog>
@@ -18,6 +19,11 @@
 #include <QRegularExpression>
 #include <QMenuBar>
 #include <QCloseEvent>
+#include <QDialog>
+#include <QListWidget>
+#include <QDialogButtonBox>
+#include <QTextEdit>
+#include <QFormLayout>
 
 static const char *DARK_STYLE = R"(
 QMainWindow, QWidget { background: #111318; color: #d7dae0; font-family: "Segoe UI"; font-size: 10pt; }
@@ -42,6 +48,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     auto *editMenu = menuBar()->addMenu("&Edit");
     auto *viewMenu = menuBar()->addMenu("&View");
     auto *runMenu = menuBar()->addMenu("&Test");
+    auto *toolsMenu = menuBar()->addMenu("&Tools");
 
     auto addAction = [this](QMenu *menu, const QString &label, const QKeySequence &shortcut, auto callback) {
         QAction *action = menu->addAction(label);
@@ -68,6 +75,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     addAction(editMenu, "Replace Current", QKeySequence("Ctrl+H"), [this] { showFindBar(); replaceInput->setFocus(); });
     addAction(viewMenu, "Clear Console", QKeySequence("Ctrl+L"), [this] { clearConsole(); });
     addAction(runMenu, "Run Static Checks", QKeySequence("F5"), [this] { runChecks(); });
+    addAction(toolsMenu, "Script History...", QKeySequence("Ctrl+Shift+H"), [this] { showHistory(); });
+    addAction(toolsMenu, "Save History Snapshot", QKeySequence("Ctrl+Alt+S"), [this] { saveHistorySnapshot(); });
+    addAction(toolsMenu, "Audit UNC/sUNC API Usage...", QKeySequence("Ctrl+Shift+U"), [this] { auditApiCompatibility(); });
 
     toolbar->addAction("New", this, &MainWindow::newTab);
     toolbar->addAction("Open", this, &MainWindow::openFile);
@@ -75,6 +85,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     toolbar->addSeparator();
     toolbar->addAction("Find", this, &MainWindow::showFindBar);
     toolbar->addAction("Run Checks", this, &MainWindow::runChecks);
+    toolbar->addAction("History", this, &MainWindow::showHistory);
+    toolbar->addAction("API Audit", this, &MainWindow::auditApiCompatibility);
 
     auto *central = new QWidget(this);
     auto *layout = new QVBoxLayout(central);
@@ -133,6 +145,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     applySettings();
     newTab();
     appendConsole("Verste started. F5 runs static checks only; scripts are not executed.");
+    appendConsole("Script history and UNC/sUNC compatibility audit are available under Tools.");
 }
 
 void MainWindow::applySettings() {
@@ -283,6 +296,7 @@ void MainWindow::runChecks() {
     if (!editor) return;
     const QString code = editor->toPlainText();
     appendConsole("--- Static checks started ---");
+    ScriptHistory::save(editor->toPlainText(), currentFilePath().isEmpty() ? "Untitled" : QFileInfo(currentFilePath()).fileName(), "Static-check snapshot");
     int issues = 0;
     if (code.trimmed().isEmpty()) {
         appendConsole("ERROR: Editor is empty.");
@@ -321,4 +335,76 @@ void MainWindow::runChecks() {
     }
     appendConsole(QString("Static checks finished. Potential issue count: %1. Not a full Luau parser.").arg(issues));
     status->setText(QString("Checks complete: %1 potential issue(s)").arg(issues));
+}
+
+
+void MainWindow::saveHistorySnapshot() {
+    auto *editor = currentEditor();
+    if (!editor) return;
+    const QString label = currentFilePath().isEmpty() ? QString("Untitled") : QFileInfo(currentFilePath()).fileName();
+    ScriptHistory::save(editor->toPlainText(), label, "Manual snapshot");
+    appendConsole("History snapshot saved: " + label);
+    status->setText("History snapshot saved");
+}
+
+void MainWindow::showHistory() {
+    QDialog dialog(this);
+    dialog.setWindowTitle("Script History");
+    dialog.resize(760, 500);
+    auto *layout = new QVBoxLayout(&dialog);
+    auto *list = new QListWidget(&dialog);
+    auto *preview = new QPlainTextEdit(&dialog);
+    preview->setReadOnly(true);
+    auto *split = new QSplitter(Qt::Vertical, &dialog);
+    split->addWidget(list);
+    split->addWidget(preview);
+    split->setStretchFactor(0, 2);
+    split->setStretchFactor(1, 3);
+    layout->addWidget(split);
+    const auto entries = ScriptHistory::entries();
+    for (const auto &entry : entries) {
+        auto *item = new QListWidgetItem(entry.timestamp.toString("yyyy-MM-dd HH:mm:ss") + " — " + entry.label + " [" + entry.reason + "]", list);
+        item->setData(Qt::UserRole, entry.id);
+    }
+    connect(list, &QListWidget::currentRowChanged, &dialog, [&entries, preview](int row) {
+        if (row >= 0 && row < entries.size()) preview->setPlainText(entries[row].source);
+        else preview->clear();
+    });
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, &dialog);
+    auto *restore = buttons->addButton("Restore into New Tab", QDialogButtonBox::ActionRole);
+    connect(restore, &QPushButton::clicked, &dialog, [&]() {
+        const int row = list->currentRow();
+        if (row < 0 || row >= entries.size()) return;
+        newTab();
+        currentEditor()->setPlainText(entries[row].source);
+        setCurrentFilePath(QString());
+        tabs->setTabText(tabs->currentIndex(), "History Restore*");
+        status->setText("Restored history snapshot into a new tab");
+        dialog.accept();
+    });
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    layout->addWidget(buttons);
+    if (!entries.isEmpty()) list->setCurrentRow(0);
+    dialog.exec();
+}
+
+void MainWindow::auditApiCompatibility() {
+    const QString source = currentEditor() ? currentEditor()->toPlainText() : QString();
+    const auto report = ApiCatalog::audit(source);
+    QDialog dialog(this);
+    dialog.setWindowTitle("UNC / sUNC Compatibility Audit");
+    dialog.resize(780, 560);
+    auto *layout = new QVBoxLayout(&dialog);
+    auto *summary = new QLabel(QString("Found %1 known API name(s) in the current source. This is a name-based audit, not a runtime test. Verste does not expose executor APIs.").arg(report.detected.size()), &dialog);
+    summary->setWordWrap(true);
+    layout->addWidget(summary);
+    auto *results = new QPlainTextEdit(&dialog);
+    results->setReadOnly(true);
+    results->setPlainText(report.text);
+    layout->addWidget(results);
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, &dialog);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    layout->addWidget(buttons);
+    dialog.exec();
+    appendConsole(QString("UNC/sUNC audit complete: %1 API name(s) detected; no APIs were executed.").arg(report.detected.size()));
 }
