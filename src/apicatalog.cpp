@@ -42,7 +42,7 @@ ApiCatalog::Report ApiCatalog::audit(const QString &source) {
     QSet<QString> found;
     for (const QString &api : catalog) {
         QString pattern = QRegularExpression::escape(api);
-        pattern.replace("\\.", "\\\\s*\\\\.\\\\s*");
+        pattern.replace("\\.", "\\s*\\.\\s*");
         const QRegularExpression expression(
             QString("(?<![A-Za-z0-9_])%1(?![A-Za-z0-9_])").arg(pattern));
         if (expression.match(source).hasMatch()) found.insert(api);
